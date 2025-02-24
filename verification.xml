@@ -1,0 +1,951 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.6//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_6.dtd'>
+<nta>
+	<declaration>// Place global declarations here.
+const int CHANNELS=2;
+typedef int [0,CHANNELS-1] id_t;
+int STO_input[CHANNELS] = {1, 1};
+int channel_input[CHANNELS] ={0,0};
+
+int pulse_gen_failure[CHANNELS] = {0,0};
+int isolation_failure[CHANNELS] = {0,0};
+int OVP_error=0;
+int input_voltage=0;
+// ---------------------Channels ------------------------
+chan switch_on[id_t];
+chan switch_off[id_t];
+
+chan power_on[id_t];
+chan power_off[id_t];
+
+chan pulse[id_t];
+chan isolation[id_t];
+chan bpf[id_t];
+chan motor_on;
+chan motor_off;
+broadcast chan start;
+broadcast chan stop;
+broadcast chan reporting;
+chan resolved;
+chan inspect;
+chan check_signal;
+//chan voltage_input;
+bool stopped=false;
+int go=2;
+int high = 1;
+
+bool fault = false;
+bool ready=false;
+int m_status=0;
+int[0,120000] global_time=0;
+int[0,120000] minute=60000;
+int failures[2][4]={{0,0,0,0},{0,0,0,0}}; // for pulse generator, isolation block, switch and drive
+
+
+//---------changes 1------------------/////////
+int f_count_p[2]={0,0};
+int f_count_i[2]={0,0};
+int f_count_f[2]={0,0};
+int f_count_s[2]={0,0};
+//---------changes 1------------------/////////
+int detected=0;
+int undetected=0;
+int DC;
+bool checked;
+int done=0;
+
+clock z;
+clock limit_time;
+
+int found;
+// ---------------------Channels ------------------------
+</declaration>
+	<template>
+		<name>Initializer</name>
+		<declaration>clock x;
+
+//changes 3.......//////
+void reset_failures(){
+    int i;
+    int j;
+    for (i=0; i&lt;2; i++){
+        for (j=0; j&lt;4; j++){
+            failures[i][j] = 0;
+        }
+    }
+}
+
+//changes 3.......//////</declaration>
+		<location id="id0" x="-535" y="-93">
+			<name x="-518" y="-119">Idle</name>
+			<committed/>
+		</location>
+		<location id="id1" x="-127" y="-93">
+			<label kind="invariant" x="-110" y="-102">x&lt;=20</label>
+		</location>
+		<location id="id2" x="-306" y="-204">
+			<name x="-314" y="-187">STO</name>
+		</location>
+		<location id="id3" x="-306" y="-93">
+			<name x="-348" y="-127">Monitoring</name>
+		</location>
+		<location id="id4" x="-535" y="-204">
+			<name x="-527" y="-195">STO_resolved</name>
+			<committed/>
+		</location>
+		<init ref="id0"/>
+		<transition id="id5">
+			<source ref="id4"/>
+			<target ref="id0"/>
+			<label kind="assignment" x="-527" y="-170">reset_failures(),
+stopped=0</label>
+			<nail x="-535" y="-127"/>
+		</transition>
+		<transition id="id6">
+			<source ref="id2"/>
+			<target ref="id4"/>
+			<label kind="synchronisation" x="-425" y="-229">resolved?</label>
+			<nail x="-476" y="-204"/>
+		</transition>
+		<transition id="id7">
+			<source ref="id3"/>
+			<target ref="id1"/>
+			<label kind="synchronisation" x="-246" y="-119">reporting?</label>
+			<label kind="assignment" x="-263" y="-93">stopped=1, x=0</label>
+		</transition>
+		<transition id="id8">
+			<source ref="id0"/>
+			<target ref="id3"/>
+			<label kind="synchronisation" x="-467" y="-119">start!</label>
+			<label kind="assignment" x="-510" y="-93">go=2, global_time=0</label>
+		</transition>
+		<transition id="id9">
+			<source ref="id1"/>
+			<target ref="id2"/>
+			<label kind="synchronisation" x="-178" y="-229">stop!</label>
+			<nail x="-127" y="-204"/>
+		</transition>
+	</template>
+	<template>
+		<name x="5" y="5">STOChannel</name>
+		<declaration>// Place local declarations here.
+
+clock a;
+
+
+void set_input(){
+    channel_input[0] = STO_input[0];  
+    channel_input[1] = STO_input[1];
+}
+
+
+
+</declaration>
+		<location id="id10" x="25" y="0">
+			<name x="15" y="-34">Inactive</name>
+		</location>
+		<location id="id11" x="238" y="0">
+			<name x="178" y="-34">Active</name>
+			<label kind="exponentialrate" x="221" y="17">1</label>
+		</location>
+		<location id="id12" x="501" y="-59">
+			<committed/>
+		</location>
+		<init ref="id10"/>
+		<transition id="id13">
+			<source ref="id11"/>
+			<target ref="id10"/>
+			<label kind="guard" x="93" y="34">stopped==1</label>
+			<label kind="synchronisation" x="110" y="59">stop?</label>
+			<nail x="238" y="59"/>
+			<nail x="25" y="59"/>
+		</transition>
+		<transition id="id14">
+			<source ref="id11"/>
+			<target ref="id12"/>
+			<label kind="guard" x="263" y="25">stopped==0 and go==2 and 
+fault==0 and global_time!=1 and 
+limit_time&lt;100</label>
+			<label kind="synchronisation" x="263" y="0">pulse[0]!</label>
+			<nail x="501" y="0"/>
+		</transition>
+		<transition id="id15">
+			<source ref="id12"/>
+			<target ref="id11"/>
+			<label kind="synchronisation" x="272" y="-85">pulse[1]!</label>
+			<nail x="238" y="-59"/>
+			<nail x="238" y="-25"/>
+		</transition>
+		<transition id="id16">
+			<source ref="id10"/>
+			<target ref="id11"/>
+			<label kind="synchronisation" x="110" y="-25">start?</label>
+			<label kind="assignment" x="85" y="0">set_input()</label>
+		</transition>
+	</template>
+	<template>
+		<name>UserInterface</name>
+		<location id="id17" x="-1275" y="-170">
+			<name x="-1292" y="-153">Idle</name>
+		</location>
+		<location id="id18" x="-1003" y="-170">
+			<name x="-1037" y="-153">Resolving</name>
+		</location>
+		<init ref="id17"/>
+		<transition id="id19">
+			<source ref="id18"/>
+			<target ref="id17"/>
+			<label kind="synchronisation" x="-1215" y="-246">resolved!</label>
+			<label kind="assignment" x="-1113" y="-246">fault=0</label>
+			<nail x="-1003" y="-221"/>
+			<nail x="-1275" y="-221"/>
+		</transition>
+		<transition id="id20">
+			<source ref="id17"/>
+			<target ref="id18"/>
+			<label kind="synchronisation" x="-1190" y="-195">reporting?</label>
+		</transition>
+	</template>
+	<template>
+		<name>PulseGenerator</name>
+		<parameter>const id_t ch_id</parameter>
+		<declaration>clock b;
+
+
+void DC_to_AC(int channel_id){
+    channel_input[ch_id] = channel_input[ch_id]+50;  
+}
+
+void check_voltage(){
+    if (input_voltage &gt;= 11 and input_voltage&lt;=30){
+        OVP_error=0;
+    }
+    else if (input_voltage &gt;= -3 and input_voltage&lt;=5){
+        OVP_error=0;
+    } 
+
+} 
+</declaration>
+		<location id="id21" x="-1045" y="-331">
+		</location>
+		<location id="id22" x="-688" y="-331">
+			<name x="-671" y="-365">Generating</name>
+			<label kind="invariant" x="-671" y="-340">b&lt;=5</label>
+		</location>
+		<init ref="id21"/>
+		<transition id="id23">
+			<source ref="id22"/>
+			<target ref="id21"/>
+			<label kind="guard" x="-994" y="-272">b==5</label>
+			<label kind="synchronisation" x="-935" y="-272">isolation[ch_id]!</label>
+			<label kind="assignment" x="-935" y="-238">DC_to_AC(ch_id), z=0</label>
+			<nail x="-688" y="-246"/>
+			<nail x="-1045" y="-246"/>
+		</transition>
+		<transition id="id24">
+			<source ref="id21"/>
+			<target ref="id22"/>
+			<label kind="synchronisation" x="-926" y="-357">pulse[ch_id]?</label>
+			<label kind="assignment" x="-986" y="-323">check_voltage(), go=0, b=0</label>
+		</transition>
+	</template>
+	<template>
+		<name>Isolation</name>
+		<parameter>const id_t ch_id</parameter>
+		<declaration>clock c;
+
+void detect_failure(int ch_id){
+    pulse_gen_failure[ch_id] = 1;
+    isolation_failure [ch_id]= 0;
+}
+
+void AC_to_DC(int channel_id){
+    channel_input[ch_id] = channel_input[ch_id]-50; 
+    detect_failure(ch_id);
+}
+
+
+</declaration>
+		<location id="id25" x="-688" y="-187">
+		</location>
+		<location id="id26" x="-289" y="-187">
+			<name x="-280" y="-221">Isolating</name>
+			<label kind="invariant" x="-272" y="-170">c&lt;=5</label>
+		</location>
+		<init ref="id25"/>
+		<transition id="id27">
+			<source ref="id26"/>
+			<target ref="id25"/>
+			<label kind="guard" x="-629" y="-110">c==5</label>
+			<label kind="synchronisation" x="-578" y="-110">bpf[ch_id]!</label>
+			<label kind="assignment" x="-467" y="-110">AC_to_DC(ch_id),z=0</label>
+			<nail x="-289" y="-85"/>
+			<nail x="-688" y="-85"/>
+		</transition>
+		<transition id="id28">
+			<source ref="id25"/>
+			<target ref="id26"/>
+			<label kind="synchronisation" x="-578" y="-212">isolation[ch_id]?</label>
+			<label kind="assignment" x="-399" y="-212">c=0</label>
+		</transition>
+	</template>
+	<template>
+		<name>BPF</name>
+		<parameter>const id_t ch_id</parameter>
+		<declaration>clock d;</declaration>
+		<location id="id29" x="-25" y="59">
+			<name x="-68" y="25">Idle</name>
+		</location>
+		<location id="id30" x="680" y="59">
+			<name x="697" y="34">Filtering</name>
+			<label kind="invariant" x="697" y="76">d&lt;=5</label>
+		</location>
+		<location id="id31" x="399" y="0">
+			<committed/>
+		</location>
+		<location id="id32" x="399" y="119">
+			<committed/>
+		</location>
+		<init ref="id29"/>
+		<transition id="id33">
+			<source ref="id32"/>
+			<target ref="id29"/>
+			<label kind="synchronisation" x="76" y="93">switch_off[ch_id]!</label>
+			<label kind="assignment" x="119" y="127">z=0</label>
+			<nail x="348" y="119"/>
+			<nail x="-25" y="119"/>
+		</transition>
+		<transition id="id34">
+			<source ref="id31"/>
+			<target ref="id29"/>
+			<label kind="synchronisation" x="85" y="-25">switch_on[ch_id]!</label>
+			<label kind="assignment" x="127" y="0">z=0</label>
+			<nail x="365" y="0"/>
+			<nail x="-25" y="0"/>
+		</transition>
+		<transition id="id35">
+			<source ref="id30"/>
+			<target ref="id31"/>
+			<label kind="guard" x="467" y="-25">high==1 and d==5</label>
+			<nail x="680" y="0"/>
+		</transition>
+		<transition id="id36">
+			<source ref="id30"/>
+			<target ref="id32"/>
+			<label kind="guard" x="467" y="127">high==0 and d==5</label>
+			<nail x="680" y="119"/>
+		</transition>
+		<transition id="id37">
+			<source ref="id29"/>
+			<target ref="id30"/>
+			<label kind="synchronisation" x="450" y="34">bpf[ch_id]?</label>
+			<label kind="assignment" x="-7" y="59">d=0</label>
+			<nail x="59" y="59"/>
+			<nail x="221" y="59"/>
+		</transition>
+	</template>
+	<template>
+		<name>Switch</name>
+		<parameter>const id_t ch_id</parameter>
+		<declaration>
+clock e;
+
+int supply_on=0;
+int supply_off=0;</declaration>
+		<location id="id38" x="-1657" y="-221">
+			<name x="-1640" y="-229">Open</name>
+		</location>
+		<location id="id39" x="-1292" y="-221">
+			<name x="-1360" y="-229">Closed</name>
+		</location>
+		<location id="id40" x="-1462" y="-272">
+			<label kind="invariant" x="-1479" y="-255">e&lt;=5</label>
+		</location>
+		<location id="id41" x="-1496" y="-170">
+			<label kind="invariant" x="-1513" y="-204">e&lt;=5</label>
+		</location>
+		<location id="id42" x="-1113" y="-221">
+			<label kind="invariant" x="-1164" y="-229">e&lt;=5</label>
+		</location>
+		<location id="id43" x="-1836" y="-221">
+			<label kind="invariant" x="-1819" y="-229">e&lt;=5</label>
+		</location>
+		<init ref="id38"/>
+		<transition id="id44">
+			<source ref="id43"/>
+			<target ref="id38"/>
+			<label kind="guard" x="-1759" y="-195">e==5</label>
+			<label kind="synchronisation" x="-1819" y="-170">power_off[ch_id]!</label>
+			<nail x="-1836" y="-170"/>
+			<nail x="-1666" y="-170"/>
+		</transition>
+		<transition id="id45">
+			<source ref="id38"/>
+			<target ref="id43"/>
+			<label kind="synchronisation" x="-1819" y="-297">switch_off[ch_id]?</label>
+			<label kind="assignment" x="-1734" y="-272">e=0</label>
+			<nail x="-1666" y="-272"/>
+			<nail x="-1836" y="-272"/>
+		</transition>
+		<transition id="id46">
+			<source ref="id39"/>
+			<target ref="id42"/>
+			<label kind="synchronisation" x="-1258" y="-297">switch_on[ch_id]?</label>
+			<label kind="assignment" x="-1207" y="-272">e=0</label>
+			<nail x="-1275" y="-272"/>
+			<nail x="-1113" y="-272"/>
+		</transition>
+		<transition id="id47">
+			<source ref="id42"/>
+			<target ref="id39"/>
+			<label kind="guard" x="-1207" y="-195">e==5</label>
+			<label kind="synchronisation" x="-1249" y="-170">power_on[ch_id]!</label>
+			<nail x="-1113" y="-170"/>
+			<nail x="-1275" y="-170"/>
+		</transition>
+		<transition id="id48">
+			<source ref="id41"/>
+			<target ref="id38"/>
+			<label kind="guard" x="-1589" y="-195">e==5</label>
+			<label kind="synchronisation" x="-1649" y="-170">power_off[ch_id]!</label>
+			<nail x="-1657" y="-170"/>
+		</transition>
+		<transition id="id49">
+			<source ref="id39"/>
+			<target ref="id41"/>
+			<label kind="synchronisation" x="-1445" y="-195">switch_off[ch_id]?</label>
+			<label kind="assignment" x="-1394" y="-170">e=0</label>
+			<nail x="-1292" y="-170"/>
+		</transition>
+		<transition id="id50">
+			<source ref="id40"/>
+			<target ref="id39"/>
+			<label kind="guard" x="-1368" y="-297">e==5</label>
+			<label kind="synchronisation" x="-1428" y="-272">power_on[ch_id]!</label>
+			<nail x="-1292" y="-272"/>
+		</transition>
+		<transition id="id51">
+			<source ref="id38"/>
+			<target ref="id40"/>
+			<label kind="synchronisation" x="-1632" y="-297">switch_on[ch_id]?</label>
+			<label kind="assignment" x="-1564" y="-272">e=0</label>
+			<nail x="-1657" y="-272"/>
+		</transition>
+	</template>
+	<template>
+		<name>DiagnosticBlock</name>
+		<declaration>
+
+int off=0;
+clock f;
+
+//changes---------2
+void diagnose(){
+    int i;
+    int j;
+    for (i=0; i&lt;2; i++){
+        for (j=0; j&lt;4; j++){
+            if (failures[i][j] == 1){
+                fault = true;
+            }
+        }
+    }
+}
+//changes---------2
+
+void calculate_coverage(){
+    if (detected+undetected &gt; 0){
+        DC = (detected*100)/(detected+undetected);
+    }
+    else{
+        DC = 0;
+    }
+}
+
+</declaration>
+		<location id="id52" x="0" y="0">
+		</location>
+		<location id="id53" x="212" y="0">
+			<urgent/>
+		</location>
+		<location id="id54" x="348" y="0">
+			<committed/>
+		</location>
+		<location id="id55" x="501" y="0">
+			<committed/>
+		</location>
+		<location id="id56" x="501" y="93">
+			<committed/>
+		</location>
+		<location id="id57" x="263" y="93">
+			<name x="246" y="59">Stopping</name>
+		</location>
+		<location id="id58" x="654" y="-119">
+			<name x="552" y="-119">Undetect</name>
+			<committed/>
+		</location>
+		<location id="id59" x="654" y="93">
+			<name x="671" y="85">Detect</name>
+			<committed/>
+		</location>
+		<location id="id60" x="654" y="0">
+		</location>
+		<init ref="id52"/>
+		<transition id="id61">
+			<source ref="id60"/>
+			<target ref="id58"/>
+			<label kind="guard" x="654" y="-93">found==0</label>
+		</transition>
+		<transition id="id62">
+			<source ref="id60"/>
+			<target ref="id59"/>
+			<label kind="guard" x="654" y="12">found==1</label>
+			<label kind="assignment" x="654" y="46">z=0</label>
+		</transition>
+		<transition id="id63">
+			<source ref="id55"/>
+			<target ref="id60"/>
+			<label kind="select" x="519" y="-51">i:int[0,1]</label>
+			<label kind="assignment" x="519" y="0">found=i</label>
+		</transition>
+		<transition id="id64">
+			<source ref="id58"/>
+			<target ref="id52"/>
+			<label kind="assignment" x="85" y="-153">global_time=0, undetected++, fault=0, calculate_coverage()</label>
+			<nail x="0" y="-127"/>
+		</transition>
+		<transition id="id65">
+			<source ref="id59"/>
+			<target ref="id56"/>
+			<label kind="synchronisation" x="527" y="68">switch_off[0]!</label>
+			<label kind="assignment" x="552" y="93">detected++</label>
+			<nail x="637" y="93"/>
+		</transition>
+		<transition id="id66">
+			<source ref="id54"/>
+			<target ref="id52"/>
+			<label kind="guard" x="127" y="-110">fault == 0</label>
+			<label kind="assignment" x="93" y="-76">global_time=0</label>
+			<nail x="348" y="-85"/>
+			<nail x="0" y="-85"/>
+		</transition>
+		<transition id="id67">
+			<source ref="id57"/>
+			<target ref="id52"/>
+			<label kind="guard" x="25" y="68">done==2</label>
+			<label kind="synchronisation" x="110" y="68">reporting!</label>
+			<label kind="assignment" x="68" y="102">global_time=0</label>
+			<nail x="0" y="93"/>
+			<nail x="0" y="59"/>
+		</transition>
+		<transition id="id68">
+			<source ref="id56"/>
+			<target ref="id57"/>
+			<label kind="synchronisation" x="348" y="68">switch_off[1]!</label>
+			<label kind="assignment" x="306" y="102">calculate_coverage()</label>
+		</transition>
+		<transition id="id69">
+			<source ref="id54"/>
+			<target ref="id55"/>
+			<label kind="guard" x="374" y="-25">fault == 1</label>
+		</transition>
+		<transition id="id70">
+			<source ref="id53"/>
+			<target ref="id54"/>
+			<label kind="assignment" x="238" y="0">diagnose()</label>
+		</transition>
+		<transition id="id71">
+			<source ref="id52"/>
+			<target ref="id53"/>
+			<label kind="guard" x="51" y="-25">global_time==1</label>
+			<label kind="synchronisation" x="76" y="0">inspect!</label>
+			<label kind="assignment" x="18" y="0">done=0</label>
+		</transition>
+	</template>
+	<template>
+		<name>PowerProcessing</name>
+		<parameter>const id_t ch_id</parameter>
+		<declaration>clock g;
+int on;
+int off;</declaration>
+		<location id="id72" x="-1538" y="-595">
+			<name x="-1521" y="-603">Inactive</name>
+		</location>
+		<location id="id73" x="-1190" y="-595">
+			<name x="-1258" y="-603">Active</name>
+		</location>
+		<location id="id74" x="-1351" y="-646">
+			<label kind="invariant" x="-1368" y="-629">g&lt;=5</label>
+		</location>
+		<location id="id75" x="-1394" y="-544">
+			<label kind="invariant" x="-1411" y="-578">g&lt;=5</label>
+		</location>
+		<location id="id76" x="-1011" y="-595">
+			<label kind="invariant" x="-1062" y="-604">g&lt;=5</label>
+		</location>
+		<location id="id77" x="-1725" y="-595">
+			<label kind="invariant" x="-1708" y="-603">g&lt;=5</label>
+		</location>
+		<init ref="id72"/>
+		<transition id="id78">
+			<source ref="id77"/>
+			<target ref="id72"/>
+			<label kind="guard" x="-1657" y="-544">g==5</label>
+			<label kind="synchronisation" x="-1674" y="-569">motor_off!</label>
+			<nail x="-1725" y="-544"/>
+			<nail x="-1564" y="-544"/>
+		</transition>
+		<transition id="id79">
+			<source ref="id72"/>
+			<target ref="id77"/>
+			<label kind="synchronisation" x="-1708" y="-671">power_off[ch_id]?</label>
+			<label kind="assignment" x="-1657" y="-646">g=0</label>
+			<nail x="-1555" y="-646"/>
+			<nail x="-1725" y="-646"/>
+		</transition>
+		<transition id="id80">
+			<source ref="id76"/>
+			<target ref="id73"/>
+			<label kind="guard" x="-1105" y="-569">g==5</label>
+			<label kind="synchronisation" x="-1113" y="-544">motor_on!</label>
+			<nail x="-1011" y="-544"/>
+			<nail x="-1164" y="-544"/>
+		</transition>
+		<transition id="id81">
+			<source ref="id73"/>
+			<target ref="id76"/>
+			<label kind="synchronisation" x="-1147" y="-671">power_on[ch_id]?</label>
+			<label kind="assignment" x="-1105" y="-646">g=0</label>
+			<nail x="-1173" y="-646"/>
+			<nail x="-1011" y="-646"/>
+		</transition>
+		<transition id="id82">
+			<source ref="id75"/>
+			<target ref="id72"/>
+			<label kind="guard" x="-1496" y="-569">g==5</label>
+			<label kind="synchronisation" x="-1513" y="-544">motor_off!</label>
+			<nail x="-1538" y="-544"/>
+		</transition>
+		<transition id="id83">
+			<source ref="id73"/>
+			<target ref="id75"/>
+			<label kind="synchronisation" x="-1343" y="-569">power_off[ch_id]?</label>
+			<label kind="assignment" x="-1292" y="-544">g=0</label>
+			<nail x="-1190" y="-544"/>
+		</transition>
+		<transition id="id84">
+			<source ref="id74"/>
+			<target ref="id73"/>
+			<label kind="guard" x="-1283" y="-671">g==5</label>
+			<label kind="synchronisation" x="-1300" y="-646">motor_on!</label>
+			<nail x="-1190" y="-646"/>
+		</transition>
+		<transition id="id85">
+			<source ref="id72"/>
+			<target ref="id74"/>
+			<label kind="synchronisation" x="-1513" y="-671">power_on[ch_id]?</label>
+			<label kind="assignment" x="-1470" y="-646">g=0</label>
+			<nail x="-1538" y="-646"/>
+		</transition>
+	</template>
+	<template>
+		<name>Motor</name>
+		<declaration>
+void check_diognostics(){
+    if(fault==true){
+        ready=true;
+    }
+}
+
+int m_off;
+int m_on;</declaration>
+		<location id="id86" x="-867" y="-187">
+			<name x="-850" y="-196">Off</name>
+		</location>
+		<location id="id87" x="-450" y="-178">
+			<name x="-493" y="-187">On</name>
+		</location>
+		<location id="id88" x="-578" y="-127">
+		</location>
+		<location id="id89" x="-739" y="-238">
+		</location>
+		<location id="id90" x="-238" y="-178">
+		</location>
+		<location id="id91" x="-1071" y="-187">
+		</location>
+		<init ref="id86"/>
+		<transition id="id92">
+			<source ref="id90"/>
+			<target ref="id87"/>
+			<label kind="synchronisation" x="-374" y="-170">motor_on?</label>
+			<label kind="assignment" x="-416" y="-144">m_status=1, go=2,
+global_time++, done=2</label>
+			<nail x="-238" y="-127"/>
+			<nail x="-433" y="-127"/>
+		</transition>
+		<transition id="id93">
+			<source ref="id87"/>
+			<target ref="id90"/>
+			<label kind="synchronisation" x="-357" y="-263">motor_on?</label>
+			<nail x="-433" y="-238"/>
+			<nail x="-238" y="-238"/>
+		</transition>
+		<transition id="id94">
+			<source ref="id91"/>
+			<target ref="id86"/>
+			<label kind="synchronisation" x="-1045" y="-161">motor_off?</label>
+			<label kind="assignment" x="-1062" y="-144">m_status=0, go=2, 
+global_time++, done=2</label>
+			<nail x="-1071" y="-127"/>
+			<nail x="-884" y="-127"/>
+		</transition>
+		<transition id="id95">
+			<source ref="id86"/>
+			<target ref="id91"/>
+			<label kind="synchronisation" x="-1020" y="-263">motor_off?</label>
+			<nail x="-884" y="-238"/>
+			<nail x="-1071" y="-238"/>
+		</transition>
+		<transition id="id96">
+			<source ref="id88"/>
+			<target ref="id86"/>
+			<label kind="synchronisation" x="-680" y="-153">motor_off?</label>
+			<label kind="assignment" x="-850" y="-144">m_status=0, go=2,
+global_time++, done=2</label>
+			<nail x="-867" y="-127"/>
+		</transition>
+		<transition id="id97">
+			<source ref="id87"/>
+			<target ref="id88"/>
+			<label kind="synchronisation" x="-535" y="-144">motor_off?</label>
+			<nail x="-450" y="-127"/>
+		</transition>
+		<transition id="id98">
+			<source ref="id89"/>
+			<target ref="id87"/>
+			<label kind="synchronisation" x="-714" y="-263">motor_on?</label>
+			<label kind="assignment" x="-629" y="-255">m_status=1, go=2,
+global_time++, done=2</label>
+			<nail x="-450" y="-238"/>
+		</transition>
+		<transition id="id99">
+			<source ref="id86"/>
+			<target ref="id89"/>
+			<label kind="synchronisation" x="-841" y="-263">motor_on?</label>
+			<nail x="-867" y="-238"/>
+		</transition>
+	</template>
+	<template>
+		<name>Faults</name>
+		<parameter>const id_t ch_id</parameter>
+		<declaration>
+void update_failures(int ch_id, int x){
+    failures[ch_id][x]=1;
+}</declaration>
+		<location id="id100" x="-739" y="-153">
+		</location>
+		<location id="id101" x="-569" y="-212">
+			<name x="-579" y="-246">NoFault</name>
+			<committed/>
+		</location>
+		<location id="id102" x="-561" y="-119">
+			<name x="-578" y="-102">Fault</name>
+			<committed/>
+		</location>
+		<location id="id103" x="-399" y="-221">
+			<name x="-459" y="-238">Pulse</name>
+			<committed/>
+		</location>
+		<location id="id104" x="-348" y="-161">
+			<name x="-382" y="-187">Iso</name>
+			<committed/>
+		</location>
+		<location id="id105" x="-348" y="-85">
+			<name x="-416" y="-93">Filter</name>
+			<committed/>
+		</location>
+		<location id="id106" x="-442" y="-51">
+			<name x="-501" y="-76">Switch</name>
+			<committed/>
+		</location>
+		<location id="id107" x="-654" y="-153">
+			<committed/>
+		</location>
+		<branchpoint id="id108" x="-603" y="-153"/>
+		<branchpoint id="id109" x="-442" y="-119"/>
+		<init ref="id100"/>
+		<transition id="id110" controllable="false">
+			<source ref="id107"/>
+			<target ref="id108"/>
+		</transition>
+		<transition id="id111">
+			<source ref="id108"/>
+			<target ref="id102"/>
+			<label kind="probability" x="-595" y="-136">1</label>
+		</transition>
+		<transition id="id112">
+			<source ref="id108"/>
+			<target ref="id101"/>
+			<label kind="probability" x="-603" y="-195">1</label>
+		</transition>
+		<transition id="id113">
+			<source ref="id100"/>
+			<target ref="id107"/>
+			<label kind="synchronisation" x="-721" y="-191">inspect?</label>
+		</transition>
+		<transition id="id114">
+			<source ref="id101"/>
+			<target ref="id100"/>
+			<nail x="-739" y="-212"/>
+		</transition>
+		<transition id="id115">
+			<source ref="id105"/>
+			<target ref="id100"/>
+			<label kind="assignment" x="-731" y="8">update_failures(ch_id,2),f_count_f[ch_id]++</label>
+			<nail x="-348" y="0"/>
+			<nail x="-739" y="0"/>
+		</transition>
+		<transition id="id116">
+			<source ref="id106"/>
+			<target ref="id100"/>
+			<label kind="assignment" x="-731" y="-34">update_failures(ch_id,3),f_count_s[ch_id]++</label>
+			<nail x="-739" y="-51"/>
+		</transition>
+		<transition id="id117">
+			<source ref="id104"/>
+			<target ref="id100"/>
+			<label kind="assignment" x="-722" y="-340">update_failures(ch_id,1),f_count_i[ch_id]++</label>
+			<nail x="-348" y="-314"/>
+			<nail x="-739" y="-314"/>
+			<nail x="-739" y="-212"/>
+		</transition>
+		<transition id="id118">
+			<source ref="id103"/>
+			<target ref="id100"/>
+			<label kind="assignment" x="-722" y="-297">update_failures(ch_id,0), f_count_p[ch_id]++</label>
+			<nail x="-399" y="-263"/>
+			<nail x="-739" y="-263"/>
+		</transition>
+		<transition id="id119">
+			<source ref="id109"/>
+			<target ref="id106"/>
+			<label kind="probability" x="-459" y="-102">1</label>
+		</transition>
+		<transition id="id120">
+			<source ref="id109"/>
+			<target ref="id105"/>
+			<label kind="probability" x="-382" y="-119">1</label>
+		</transition>
+		<transition id="id121">
+			<source ref="id109"/>
+			<target ref="id104"/>
+			<label kind="probability" x="-382" y="-144">1</label>
+		</transition>
+		<transition id="id122">
+			<source ref="id109"/>
+			<target ref="id103"/>
+			<label kind="probability" x="-416" y="-178">1</label>
+		</transition>
+		<transition id="id123">
+			<source ref="id102"/>
+			<target ref="id109"/>
+		</transition>
+	</template>
+	<system>// Place template instantiations here.
+/*STOChannelA = STOChannel(0);
+STOChannelB = STOChannel(1);
+
+STOSwitchA = Switch(0);
+STOSwitchB = Switch(1);*/
+
+// List one or more processes to be composed into a system.
+//system ChannelA, ChannelB, Switch, Gate_Driver, Diagnostic_Block;
+system STOChannel,Initializer,UserInterface, PulseGenerator, Isolation, BPF, Switch, DiagnosticBlock, PowerProcessing, Motor, Faults;
+
+
+</system>
+	<queries>
+		<option key="--diagnostic" value="0"/>
+		<query>
+			<formula>Switch(0).Open --&gt; PowerProcessing(0).Inactive</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2025-02-20 14:57:51 +0000">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>Switch(0).Closed --&gt; PowerProcessing(0).Active</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2025-02-20 14:57:54 +0000">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>PowerProcessing(0).Active and PowerProcessing(1).Active --&gt; Motor.On</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2025-02-20 14:13:58 +0000">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>PowerProcessing(0).Inactive and PowerProcessing(1).Inactive --&gt; Motor.Off</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2025-02-20 14:14:01 +0000">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>DiagnosticBlock.Stopping --&gt; Motor.Off</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2025-02-20 14:14:05 +0000">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>E&lt;&gt;Initializer.STO and STOChannel.Active </formula>
+			<comment/>
+			<result outcome="failure" type="quality" timestamp="2025-02-20 14:14:15 +0000">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>E&lt;&gt;Initializer.STO and (PulseGenerator(0).Generating or PulseGenerator(1).Generating)</formula>
+			<comment/>
+			<result outcome="failure" type="quality" timestamp="2025-02-20 14:14:23 +0000">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>E&lt;&gt;Initializer.STO and (Switch(0).Closed or Switch(1).Closed)</formula>
+			<comment/>
+			<result outcome="failure" type="quality" timestamp="2025-02-20 14:14:27 +0000">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>E&lt;&gt;Initializer.STO and (PowerProcessing(0).Active or PowerProcessing(1).Active)</formula>
+			<comment/>
+			<result outcome="failure" type="quality" timestamp="2025-02-20 14:14:30 +0000">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>E&lt;&gt;Initializer.STO and Motor.On </formula>
+			<comment/>
+			<result outcome="failure" type="quality" timestamp="2025-02-20 14:14:33 +0000">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>A[] ((DiagnosticBlock.Stopping and m_status == 1 and z&gt;10 and z&lt;=28) imply Motor.Off)</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2025-02-20 14:14:36 +0000">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>A&lt;&gt; ((Motor.Off and m_status == 0 and z&gt;10 and z&lt;=30) imply Initializer.STO)</formula>
+			<comment/>
+		</query>
+	</queries>
+</nta>
