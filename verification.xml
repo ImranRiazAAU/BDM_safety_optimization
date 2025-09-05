@@ -2,6 +2,7 @@
 <!DOCTYPE nta PUBLIC '-//Uppaal Team//DTD Flat System 1.6//EN' 'http://www.it.uu.se/research/group/darts/uppaal/flat-1_6.dtd'>
 <nta>
 	<declaration>// Place global declarations here.
+clock global;
 const int CHANNELS=2;
 typedef int [0,CHANNELS-1] id_t;
 int STO_input[CHANNELS] = {1, 1};
@@ -12,23 +13,23 @@ int isolation_failure[CHANNELS] = {0,0};
 int OVP_error=0;
 int input_voltage=0;
 // ---------------------Channels ------------------------
-chan switch_on[id_t];
-chan switch_off[id_t];
+broadcast chan switch_on[id_t];
+broadcast chan switch_off[id_t];
 
-chan power_on[id_t];
-chan power_off[id_t];
+broadcast chan power_on[id_t];
+broadcast chan power_off[id_t];
 
-chan pulse[id_t];
-chan isolation[id_t];
-chan bpf[id_t];
-chan motor_on;
-chan motor_off;
+broadcast chan pulse[id_t];
+broadcast chan isolation[id_t];
+broadcast chan bpf[id_t];
+broadcast chan motor_on;
+broadcast chan motor_off;
 broadcast chan start;
 broadcast chan stop;
 broadcast chan reporting;
-chan resolved;
-chan inspect;
-chan check_signal;
+broadcast chan resolved;
+broadcast chan inspect;
+broadcast chan check_signal;
 //chan voltage_input;
 bool stopped=false;
 int go=2;
@@ -164,8 +165,7 @@ void set_input(){
 			<source ref="id11"/>
 			<target ref="id12"/>
 			<label kind="guard" x="263" y="25">stopped==0 and go==2 and 
-fault==0 and global_time!=1 and 
-limit_time&lt;100</label>
+fault==0 and global_time!=1</label>
 			<label kind="synchronisation" x="263" y="0">pulse[0]!</label>
 			<nail x="501" y="0"/>
 		</transition>
@@ -190,6 +190,7 @@ limit_time&lt;100</label>
 		</location>
 		<location id="id18" x="-1003" y="-170">
 			<name x="-1037" y="-153">Resolving</name>
+			<label kind="exponentialrate" x="-1013" y="-136">1</label>
 		</location>
 		<init ref="id17"/>
 		<transition id="id19">
@@ -203,7 +204,7 @@ limit_time&lt;100</label>
 		<transition id="id20">
 			<source ref="id17"/>
 			<target ref="id18"/>
-			<label kind="synchronisation" x="-1190" y="-195">reporting?</label>
+			<label kind="synchronisation" x="-1190" y="-195">stop?</label>
 		</transition>
 	</template>
 	<template>
@@ -440,32 +441,35 @@ int off=0;
 clock f;
 
 //changes---------2
-void diagnose(){
-    int i;
-    int j;
-    for (i=0; i&lt;2; i++){
-        for (j=0; j&lt;4; j++){
-            if (failures[i][j] == 1){
-                fault = true;
-            }
-        }
-    }
-}
+ void diagnose(){
+   int i;
+   int j;
+   for (i=0; i&lt;2; i++){
+     for (j=0; j&lt;4; j++){
+       if (failures[i][j] == 1){
+         fault = true;
+       }
+     }
+   }
+ }
+
 //changes---------2
 
-void calculate_coverage(){
-    if (detected+undetected &gt; 0){
-        DC = (detected*100)/(detected+undetected);
-    }
-    else{
-        DC = 0;
-    }
-}
+ void calculate_coverage(){
+   if (detected+undetected &gt; 0){
+     DC = (detected*100)/(detected+undetected);
+   }
+   else{
+     DC = 0;
+   }
+ }
 
 </declaration>
 		<location id="id52" x="0" y="0">
+			<label kind="exponentialrate" x="-25" y="-8">1</label>
 		</location>
 		<location id="id53" x="212" y="0">
+			<name x="187" y="-42">Diagnosing</name>
 			<urgent/>
 		</location>
 		<location id="id54" x="348" y="0">
@@ -479,9 +483,10 @@ void calculate_coverage(){
 		</location>
 		<location id="id57" x="263" y="93">
 			<name x="246" y="59">Stopping</name>
+			<label kind="exponentialrate" x="255" y="110">1</label>
 		</location>
-		<location id="id58" x="654" y="-119">
-			<name x="552" y="-119">Undetect</name>
+		<location id="id58" x="654" y="-127">
+			<name x="552" y="-127">Undetect</name>
 			<committed/>
 		</location>
 		<location id="id59" x="654" y="93">
@@ -489,6 +494,7 @@ void calculate_coverage(){
 			<committed/>
 		</location>
 		<location id="id60" x="654" y="0">
+			<label kind="exponentialrate" x="680" y="-17">1</label>
 		</location>
 		<init ref="id52"/>
 		<transition id="id61">
@@ -524,8 +530,8 @@ void calculate_coverage(){
 		<transition id="id66">
 			<source ref="id54"/>
 			<target ref="id52"/>
-			<label kind="guard" x="127" y="-110">fault == 0</label>
-			<label kind="assignment" x="93" y="-76">global_time=0</label>
+			<label kind="guard" x="68" y="-85">fault == 0</label>
+			<label kind="assignment" x="178" y="-85">global_time=0</label>
 			<nail x="348" y="-85"/>
 			<nail x="0" y="-85"/>
 		</transition>
@@ -739,9 +745,13 @@ global_time++, done=2</label>
 		<name>Faults</name>
 		<parameter>const id_t ch_id</parameter>
 		<declaration>
-void update_failures(int ch_id, int x){
-    failures[ch_id][x]=1;
-}</declaration>
+ void update_failures(int id, int x){
+   failures[id][x] = 1;
+ }
+
+
+
+</declaration>
 		<location id="id100" x="-739" y="-153">
 		</location>
 		<location id="id101" x="-569" y="-212">
@@ -867,84 +877,156 @@ system STOChannel,Initializer,UserInterface, PulseGenerator, Isolation, BPF, Swi
 	<queries>
 		<option key="--diagnostic" value="0"/>
 		<query>
-			<formula>Switch(0).Open --&gt; PowerProcessing(0).Inactive</formula>
+			<formula>E&lt;&gt; STOChannel.Active</formula>
 			<comment/>
-			<result outcome="success" type="quality" timestamp="2025-02-20 14:57:51 +0000">
+			<result outcome="success" type="quality" timestamp="2025-05-26 11:32:32 +0000">
 				<option key="--diagnostic" value="0"/>
 			</result>
 		</query>
 		<query>
-			<formula>Switch(0).Closed --&gt; PowerProcessing(0).Active</formula>
+			<formula>E&lt;&gt; PulseGenerator(0).Generating</formula>
 			<comment/>
-			<result outcome="success" type="quality" timestamp="2025-02-20 14:57:54 +0000">
+			<result outcome="success" type="quality" timestamp="2025-05-26 11:35:29 +0000">
 				<option key="--diagnostic" value="0"/>
 			</result>
 		</query>
 		<query>
-			<formula>PowerProcessing(0).Active and PowerProcessing(1).Active --&gt; Motor.On</formula>
+			<formula>E&lt;&gt; Switch(0).Closed</formula>
 			<comment/>
-			<result outcome="success" type="quality" timestamp="2025-02-20 14:13:58 +0000">
+			<result outcome="success" type="quality" timestamp="2025-05-26 11:27:18 +0000">
 				<option key="--diagnostic" value="0"/>
 			</result>
 		</query>
 		<query>
-			<formula>PowerProcessing(0).Inactive and PowerProcessing(1).Inactive --&gt; Motor.Off</formula>
+			<formula>E&lt;&gt; PowerProcessing(0).Active</formula>
 			<comment/>
-			<result outcome="success" type="quality" timestamp="2025-02-20 14:14:01 +0000">
+			<result outcome="success" type="quality" timestamp="2025-05-26 11:27:51 +0000">
 				<option key="--diagnostic" value="0"/>
 			</result>
 		</query>
 		<query>
-			<formula>DiagnosticBlock.Stopping --&gt; Motor.Off</formula>
+			<formula>E&lt;&gt; DiagnosticBlock.Diagnosing</formula>
 			<comment/>
-			<result outcome="success" type="quality" timestamp="2025-02-20 14:14:05 +0000">
+			<result outcome="success" type="quality" timestamp="2025-05-26 11:29:49 +0000">
 				<option key="--diagnostic" value="0"/>
 			</result>
 		</query>
 		<query>
-			<formula>E&lt;&gt;Initializer.STO and STOChannel.Active </formula>
+			<formula>E&lt;&gt; DiagnosticBlock.Undetect</formula>
 			<comment/>
-			<result outcome="failure" type="quality" timestamp="2025-02-20 14:14:15 +0000">
+			<result outcome="success" type="quality" timestamp="2025-05-26 11:30:11 +0000">
 				<option key="--diagnostic" value="0"/>
 			</result>
 		</query>
 		<query>
-			<formula>E&lt;&gt;Initializer.STO and (PulseGenerator(0).Generating or PulseGenerator(1).Generating)</formula>
+			<formula>E&lt;&gt; DiagnosticBlock.Detect</formula>
 			<comment/>
-			<result outcome="failure" type="quality" timestamp="2025-02-20 14:14:23 +0000">
+			<result outcome="success" type="quality" timestamp="2025-05-26 11:30:27 +0000">
 				<option key="--diagnostic" value="0"/>
 			</result>
 		</query>
 		<query>
-			<formula>E&lt;&gt;Initializer.STO and (Switch(0).Closed or Switch(1).Closed)</formula>
+			<formula>E&lt;&gt; DiagnosticBlock.Stopping</formula>
 			<comment/>
-			<result outcome="failure" type="quality" timestamp="2025-02-20 14:14:27 +0000">
+			<result outcome="success" type="quality" timestamp="2025-05-26 11:30:46 +0000">
 				<option key="--diagnostic" value="0"/>
 			</result>
 		</query>
 		<query>
-			<formula>E&lt;&gt;Initializer.STO and (PowerProcessing(0).Active or PowerProcessing(1).Active)</formula>
+			<formula>E&lt;&gt; Faults(0).Fault</formula>
 			<comment/>
-			<result outcome="failure" type="quality" timestamp="2025-02-20 14:14:30 +0000">
+		</query>
+		<query>
+			<formula>E&lt;&gt; Faults(0).NoFault</formula>
+			<comment/>
+		</query>
+		<query>
+			<formula>E&lt;&gt; UserInterface.Resolving</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2025-05-26 11:33:36 +0000">
 				<option key="--diagnostic" value="0"/>
 			</result>
 		</query>
 		<query>
-			<formula>E&lt;&gt;Initializer.STO and Motor.On </formula>
+			<formula>E&lt;&gt; Initializer.Monitoring</formula>
 			<comment/>
-			<result outcome="failure" type="quality" timestamp="2025-02-20 14:14:33 +0000">
+			<result outcome="success" type="quality" timestamp="2025-05-26 11:34:59 +0000">
 				<option key="--diagnostic" value="0"/>
 			</result>
 		</query>
 		<query>
-			<formula>A[] ((DiagnosticBlock.Stopping and m_status == 1 and z&gt;10 and z&lt;=28) imply Motor.Off)</formula>
+			<formula>E&lt;&gt; Initializer.STO</formula>
 			<comment/>
-			<result outcome="success" type="quality" timestamp="2025-02-20 14:14:36 +0000">
+			<result outcome="success" type="quality" timestamp="2025-05-26 11:35:04 +0000">
 				<option key="--diagnostic" value="0"/>
 			</result>
 		</query>
 		<query>
-			<formula>A&lt;&gt; ((Motor.Off and m_status == 0 and z&gt;10 and z&lt;=30) imply Initializer.STO)</formula>
+			<formula>E&lt;&gt; Initializer.STO_resolved</formula>
+			<comment/>
+			<result outcome="success" type="quality" timestamp="2025-05-26 11:35:22 +0000">
+				<option key="--diagnostic" value="0"/>
+			</result>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000] (&lt;&gt; forall (i : id_t) i==i imply (PowerProcessing(i).Active &amp;&amp; Switch(i).Closed))</formula>
+			<comment/>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000] (&lt;&gt; forall (i : id_t) i==i imply (Motor.On &amp;&amp; PowerProcessing(i).Active &amp;&amp; Switch(i).Closed))</formula>
+			<comment/>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000] (&lt;&gt; forall (i : id_t) i==i imply (Motor.Off &amp;&amp; PowerProcessing(i).Inactive &amp;&amp; Switch(i).Open))</formula>
+			<comment/>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000] (&lt;&gt; forall (i : id_t) i==i imply (PowerProcessing(i).Active &amp;&amp; Switch(i).Open))</formula>
+			<comment/>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000] (&lt;&gt; forall (i : id_t) i==i imply (Motor.Off &amp;&amp; (PowerProcessing(i).Active &amp;&amp; Switch(i).Closed)))</formula>
+			<comment/>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000] (&lt;&gt; forall (i : id_t) i==i imply (Motor.On &amp;&amp; (PowerProcessing(i).Inactive &amp;&amp; Switch(i).Open)))</formula>
+			<comment/>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000] (&lt;&gt; Initializer.STO &amp;&amp; STOChannel.Active)</formula>
+			<comment/>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000] (&lt;&gt; UserInterface.Resolving &amp;&amp; STOChannel.Active)</formula>
+			<comment/>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000] (&lt;&gt; UserInterface.Idle &amp;&amp; Initializer.STO)</formula>
+			<comment/>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000] (&lt;&gt; UserInterface.Resolving &amp;&amp; (forall (i : id_t) i==i imply PulseGenerator(i).Generating || Switch(i).Closed || PowerProcessing(i).Active))</formula>
+			<comment>Pr[global&lt;=1000] (&lt;&gt; UserInterface.Resolving &amp;&amp; (PulseGenerator(0).Generating || Isolation(0).Isolating || BPF(0).Filtering || Switch(0).Closed || PowerProcessing(0).Active))
+Pr[global&lt;=1000] (&lt;&gt; UserInterface.Resolving &amp;&amp; (PulseGenerator(1).Generating || Isolation(1).Isolating || BPF(1).Filtering || Switch(1).Closed || PowerProcessing(1).Active))</comment>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000] (&lt;&gt; Initializer.STO &amp;&amp; (forall (i : id_t) i==i imply PulseGenerator(i).Generating || Switch(i).Closed || PowerProcessing(i).Active))</formula>
+			<comment>Pr[global&lt;=1000] (&lt;&gt; Initializer.STO &amp;&amp; (PulseGenerator(0).Generating || Isolation(0).Isolating || BPF(0).Filtering || Switch(0).Closed || PowerProcessing(0).Active))</comment>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000] (&lt;&gt; STOChannel.Inactive &amp;&amp; (forall (i : id_t) i==i imply PulseGenerator(i).Generating || Switch(i).Closed || PowerProcessing(i).Active))</formula>
+			<comment>Pr[global&lt;=1000] (&lt;&gt; STOChannel.Inactive &amp;&amp; (PulseGenerator(0).Generating || Isolation(0).Isolating || BPF(0).Filtering || Switch(0).Closed || PowerProcessing(0).Active))</comment>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000] (&lt;&gt; (STOChannel.Inactive || UserInterface.Resolving || Initializer.STO) &amp;&amp; (DiagnosticBlock.Diagnosing || Motor.On))</formula>
+			<comment/>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000]([] ((DiagnosticBlock.Stopping and m_status == 1 and z&gt;10 and z&lt;=28) imply Motor.Off))</formula>
+			<comment/>
+		</query>
+		<query>
+			<formula>Pr[global&lt;=10000](&lt;&gt; ((Motor.Off and z&lt;=30) imply Initializer.STO))</formula>
 			<comment/>
 		</query>
 	</queries>
